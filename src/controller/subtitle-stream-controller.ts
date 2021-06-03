@@ -62,7 +62,6 @@ export class SubtitleStreamController
     hls.on(Events.SUBTITLE_TRACK_SWITCH, this.onSubtitleTrackSwitch, this);
     hls.on(Events.SUBTITLE_TRACK_LOADED, this.onSubtitleTrackLoaded, this);
     hls.on(Events.SUBTITLE_FRAG_PROCESSED, this.onSubtitleFragProcessed, this);
-    hls.on(Events.BUFFER_FLUSHING, this.onBufferFlushing, this);
   }
 
   private _unregisterListeners() {
@@ -76,7 +75,6 @@ export class SubtitleStreamController
     hls.off(Events.SUBTITLE_TRACK_SWITCH, this.onSubtitleTrackSwitch, this);
     hls.off(Events.SUBTITLE_TRACK_LOADED, this.onSubtitleTrackLoaded, this);
     hls.off(Events.SUBTITLE_FRAG_PROCESSED, this.onSubtitleFragProcessed, this);
-    hls.off(Events.BUFFER_FLUSHING, this.onBufferFlushing, this);
   }
 
   startLoad() {
@@ -124,7 +122,7 @@ export class SubtitleStreamController
     }
 
     // Create/update a buffered array matching the interface used by BufferHelper.bufferedInfo
-    // so we can re-use the logic used to detect how much has been buffered
+    // so we can re-use the logic used to detect how much have been buffered
     let timeRange: TimeRange | undefined;
     const fragStart = frag.start;
     for (let i = 0; i < buffered.length; i++) {
@@ -143,33 +141,6 @@ export class SubtitleStreamController
         end: fragEnd,
       };
       buffered.push(timeRange);
-    }
-    this.fragmentTracker.fragBuffered(frag);
-  }
-
-  onBufferFlushing(
-    event: Events.BUFFER_FLUSHING,
-    { startOffset, endOffset }: BufferFlushingData
-  ) {
-    if (startOffset === 0 && endOffset !== Number.POSITIVE_INFINITY) {
-      this.tracksBuffered.forEach((buffered) => {
-        for (let i = 0; i < buffered.length; ) {
-          if (buffered[i].end <= endOffset) {
-            buffered.shift();
-            continue;
-          } else if (buffered[i].start < endOffset) {
-            buffered[i].start = endOffset;
-          } else {
-            break;
-          }
-          i++;
-        }
-      });
-      this.fragmentTracker.removeFragmentsInRange(
-        startOffset,
-        endOffset,
-        PlaylistLevelType.SUBTITLE
-      );
     }
   }
 
@@ -319,7 +290,7 @@ export class SubtitleStreamController
     }
 
     if (this.state === State.IDLE) {
-      const { currentTrackId, levels } = this;
+      const { config, currentTrackId, fragmentTracker, media, levels } = this;
       if (
         !levels.length ||
         !levels[currentTrackId] ||
@@ -331,7 +302,6 @@ export class SubtitleStreamController
       // Expand range of subs loaded by one target-duration in either direction to make up for misaligned playlists
       const trackDetails = levels[currentTrackId].details as LevelDetails;
       const targetDuration = trackDetails.targetduration;
-      const { config, media } = this;
       const bufferedInfo = BufferHelper.bufferedInfo(
         this.mediaBufferTimeRanges,
         media.currentTime - targetDuration,
@@ -390,7 +360,7 @@ export class SubtitleStreamController
         this.hls.trigger(Events.KEY_LOADING, { frag: foundFrag });
       } else if (
         foundFrag &&
-        this.fragmentTracker.getState(foundFrag) === FragmentState.NOT_LOADED
+        fragmentTracker.getState(foundFrag) === FragmentState.NOT_LOADED
       ) {
         // only load if fragment is not loaded
         this.loadFragment(foundFrag, trackDetails, targetBufferTime);
@@ -407,7 +377,7 @@ export class SubtitleStreamController
     super.loadFragment(frag, levelDetails, targetBufferTime);
   }
 
-  get mediaBufferTimeRanges(): TimeRange[] {
+  get mediaBufferTimeRanges() {
     return this.tracksBuffered[this.currentTrackId] || [];
   }
 }

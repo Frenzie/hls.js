@@ -627,26 +627,17 @@ export class TimelineController implements ComponentAPI {
     event: Events.BUFFER_FLUSHING,
     { startOffset, endOffset, type }: BufferFlushingData
   ) {
-    const { media } = this;
-    if (!media || media.currentTime < endOffset) {
-      return;
-    }
-    // Clear 608 caption cues from the captions TextTracks when the video back buffer is flushed
+    // Clear 608 CC cues from the back buffer
     // Forward cues are never removed because we can loose streamed 608 content from recent fragments
     if (!type || type === 'video') {
+      const { media } = this;
+      if (!media || media.currentTime < endOffset) {
+        return;
+      }
       const { captionsTracks } = this;
       Object.keys(captionsTracks).forEach((trackName) =>
         removeCuesInRange(captionsTracks[trackName], startOffset, endOffset)
       );
-    }
-    if (this.config.renderTextTracksNatively) {
-      // Clear VTT/IMSC1 subtitle cues from the subtitle TextTracks when the back buffer is flushed
-      if (startOffset === 0 && endOffset !== Number.POSITIVE_INFINITY) {
-        const { textTracks } = this;
-        Object.keys(textTracks).forEach((trackName) =>
-          removeCuesInRange(textTracks[trackName], startOffset, endOffset)
-        );
-      }
     }
   }
 
